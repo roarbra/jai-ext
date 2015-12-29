@@ -178,13 +178,17 @@ public class ZonalStatsOpImage extends OpImage {
         } else {
             this.classifier = null;
         }
+        
+    	// source image bounds
+        sourceBounds = new Rectangle(source.getMinX(), source.getMinY(), source.getWidth(),
+                source.getHeight());
 
         // Calculation of the inverse transformation
         classBounds = null;
         isNotIdentity = false;
+        
         if (classPresent) {
-            // source image bounds
-            sourceBounds = createBounds(source);
+
             if (transform == null) {
                 // If no transformation is set, the classifier bounds are the same of the image bounds
                 inverseTrans = new AffineTransform();
@@ -246,6 +250,10 @@ public class ZonalStatsOpImage extends OpImage {
         boolean minBoundsNull = minBound == null;
         boolean maxBoundsNull = maxBound == null;
         boolean numBinsNull = numBins == null;
+        
+        if (statsTypes == null || statsTypes.length == 0) {
+        	throw new IllegalArgumentException("statsTypes must be specified.");
+        }
 
         // Boolean indicating if one of the input arrays is null
         boolean nullCondition = minBoundsNull || maxBoundsNull || numBinsNull;
@@ -363,6 +371,11 @@ public class ZonalStatsOpImage extends OpImage {
             zoneList.add(geom);
 
         } else {
+        	
+        	if (rois.size() == 0) {
+        		throw new IllegalArgumentException("The list of ROI's can't be empty.");
+        	}
+        	
             // Bounds Union
             union = new Rectangle(rois.get(0).getBounds());
 
@@ -486,71 +499,73 @@ public class ZonalStatsOpImage extends OpImage {
     public Raster computeTile(int tileX, int tileY) {
         // Selection of the tile associated with the tile x and y indexes
         Raster tile = getSourceImage(0).getTile(tileX, tileY);
-        // Selection of the tile bounds
-        Rectangle tileRect = tile.getBounds();
-        // Boolean indicating if the tile is inside the ROI
-        boolean insideROIifPresent = true;
-        synchronized (this) {
-            insideROIifPresent = (hasROI && srcROI.intersects(tileRect) || !hasROI);
+        
+        if (tile != null) {
+	        // Selection of the tile bounds
+	        Rectangle tileRect = tile.getBounds();
+	        // Boolean indicating if the tile is inside the ROI
+	        boolean insideROIifPresent = true;
+	        synchronized (this) {
+	            insideROIifPresent = (hasROI && srcROI.intersects(tileRect) || !hasROI);
+	        }
+	        // Check if the tile is inside the geometry bound-union
+	        if (union.intersects(tileRect) && insideROIifPresent) {
+	            // STATISTICAL ELABORATIONS
+	            // selection of the format tags
+	            RasterFormatTag[] formatTags = getFormatTags();
+	            // Selection of the active calculation area
+	            Rectangle computableArea = union.intersection(tileRect);
+	
+	            // creation of the RasterAccessor
+	            RasterAccessor src = new RasterAccessor(tile, computableArea, formatTags[0],
+	                    getSourceImage(0).getColorModel());
+	
+	            // ROI calculations if roiAccessor is used
+	            RasterAccessor roi = null;
+	            if (useROIAccessor) {
+	                // Note that the getExtendedData() method is not called because the input images are padded.
+	                // For each image there is a check if the rectangle is contained inside the source image;
+	                // if this not happen, the data is taken from the padded image.
+	                Raster roiRaster = null;
+	                if(srcROIImage.getBounds().contains(computableArea)){
+	                    roiRaster = srcROIImage.getData(computableArea);
+	                }else{
+	                    roiRaster = srcROIImgExt.getData(computableArea);
+	                }
+	
+	                // creation of the rasterAccessor
+	                roi = new RasterAccessor(roiRaster, computableArea,
+	                        RasterAccessor.findCompatibleTags(new RenderedImage[] { srcROIImage },
+	                                srcROIImage)[0], srcROIImage.getColorModel());
+	            }
+	
+	            // Image dataType
+	            int dataType = tile.getSampleModel().getDataType();
+	            // From the data type is possible to choose the right calculation method
+	            switch (dataType) {
+	            case DataBuffer.TYPE_BYTE:
+	                byteLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            case DataBuffer.TYPE_USHORT:
+	                ushortLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            case DataBuffer.TYPE_SHORT:
+	                shortLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            case DataBuffer.TYPE_INT:
+	                intLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            case DataBuffer.TYPE_FLOAT:
+	                floatLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            case DataBuffer.TYPE_DOUBLE:
+	                doubleLoop(src, computableArea, tileX, tileY, roi);
+	                break;
+	            default:
+	                throw new IllegalArgumentException("Wrong data type");
+	            }
+	        }
         }
-        // Check if the tile is inside the geometry bound-union
-        if (union.intersects(tileRect) && insideROIifPresent) {
-            // STATISTICAL ELABORATIONS
-            // selection of the format tags
-            RasterFormatTag[] formatTags = getFormatTags();
-            // Selection of the active calculation area
-            Rectangle computableArea = union.intersection(tileRect);
-
-            // creation of the RasterAccessor
-            RasterAccessor src = new RasterAccessor(tile, computableArea, formatTags[0],
-                    getSourceImage(0).getColorModel());
-
-            // ROI calculations if roiAccessor is used
-            RasterAccessor roi = null;
-            if (useROIAccessor) {
-                // Note that the getExtendedData() method is not called because the input images are padded.
-                // For each image there is a check if the rectangle is contained inside the source image;
-                // if this not happen, the data is taken from the padded image.
-                Raster roiRaster = null;
-                if(srcROIImage.getBounds().contains(computableArea)){
-                    roiRaster = srcROIImage.getData(computableArea);
-                }else{
-                    roiRaster = srcROIImgExt.getData(computableArea);
-                }
-
-                // creation of the rasterAccessor
-                roi = new RasterAccessor(roiRaster, computableArea,
-                        RasterAccessor.findCompatibleTags(new RenderedImage[] { srcROIImage },
-                                srcROIImage)[0], srcROIImage.getColorModel());
-            }
-
-            // Image dataType
-            int dataType = tile.getSampleModel().getDataType();
-            // From the data type is possible to choose the right calculation method
-            switch (dataType) {
-            case DataBuffer.TYPE_BYTE:
-                byteLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            case DataBuffer.TYPE_USHORT:
-                ushortLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            case DataBuffer.TYPE_SHORT:
-                shortLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            case DataBuffer.TYPE_INT:
-                intLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            case DataBuffer.TYPE_FLOAT:
-                floatLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            case DataBuffer.TYPE_DOUBLE:
-                doubleLoop(src, computableArea, tileX, tileY, roi);
-                break;
-            default:
-                throw new IllegalArgumentException("Wrong data type");
-            }
-        }
-
         return tile;
     }
 
