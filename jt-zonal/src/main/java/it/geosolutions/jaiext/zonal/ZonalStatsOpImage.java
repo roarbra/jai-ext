@@ -4998,12 +4998,16 @@ public class ZonalStatsOpImage extends OpImage {
     public Object getProperty(String name) {
         // If the specified property is "JAI-EXT.stats", the calculations are performed.
         if (ZonalStatsDescriptor.ZS_PROPERTY.equalsIgnoreCase(name)) {
-            Point[] tileIndices = getTileIndices(union);
-            // one by one, not all together, or we'll load the entire raster in memory
-            for (Point tileIndex : tileIndices) {
-                this.getTile(tileIndex.x, tileIndex.y);
-            }
 
+        	if (LOGGER.isLoggable(Level.FINE))
+        		LOGGER.fine(String.format("Compute statistics for union [%d,%d,%d,%d]"
+        				, (long)union.getMinX(), (long)union.getMaxX(), (long)union.getMinY(), (long)union.getMaxY()));
+        	
+        	Point[] indices = getSourceImage(0).getTileIndices( null );
+        	
+        	for (Point i : indices)
+        		computeTile(i.x, i.y);
+        	
             return Collections.unmodifiableList(zoneList);
         } else {
             return super.getProperty(name);
