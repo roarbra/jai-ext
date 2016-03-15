@@ -403,6 +403,9 @@ public class ZonalStatsOpImage extends OpImage {
                 }
                 // Addition to the geometries list
                 spatialIndex.insert(env, geom);
+                if (LOGGER.isLoggable(Level.FINE))
+                	LOGGER.fine(String.format("Add ZoneGeometry: %s Env:[%d,%d,%d,%d]", geom
+                				, (long)env.getMinX(), (long)env.getMaxX(), (long)env.getMinY(), (long)env.getMaxY()));
 
                 zoneList.add(geom);
             }
@@ -495,6 +498,7 @@ public class ZonalStatsOpImage extends OpImage {
     private Rectangle createBounds(RenderedImage source) {
         return new Rectangle(source.getMinX(), source.getMinY(), source.getWidth(), source.getHeight());
     }
+    
 
     public Raster computeTile(int tileX, int tileY) {
         // Selection of the tile associated with the tile x and y indexes
@@ -1366,6 +1370,7 @@ public class ZonalStatsOpImage extends OpImage {
                     Envelope searchEnv = new Envelope(p1);
                     // Query on the geometry list
                     List<ZoneGeometry> geomList = spatialIndex.query(searchEnv);
+                    
                     // classId classifier initial value
                     int classId = 0;
                     // If the classifier is present then the classId value is taken
@@ -1400,6 +1405,11 @@ public class ZonalStatsOpImage extends OpImage {
                             contains = geometry.contains(x0, y0);
                         }
                         if (contains) {
+                        	
+                        	if (LOGGER.isLoggable(Level.FINE))
+                        		LOGGER.fine(String.format("Add band-samples for [%d,%d] to zoneGeo:%s", x0, y0, zoneGeo));
+                        	
+                        	
                             // Cycle on the selected Bands
                             for (int i = 0; i < bandNum; i++) {
                                 int sample = srcData[bands[i]][posx + posy
@@ -1424,6 +1434,9 @@ public class ZonalStatsOpImage extends OpImage {
                                     zoneGeo.add(sample, bands[i], classId, rangeHelper);
                                 }
                             }
+                        }
+                        else {
+                        	LOGGER.fine(String.format("Geometry %s doesn't contain given pixel [%d,%d].", zoneGeo, x0, y0));
                         }
                     }
                 }
@@ -4985,10 +4998,15 @@ public class ZonalStatsOpImage extends OpImage {
     public Object getProperty(String name) {
         // If the specified property is "JAI-EXT.stats", the calculations are performed.
         if (ZonalStatsDescriptor.ZS_PROPERTY.equalsIgnoreCase(name)) {
-            //getTiles();
-
-            //List<ZoneGeometry> copy = new ArrayList<ZoneGeometry>(zoneList);
-
+        	if (LOGGER.isLoggable(Level.FINE))
+        		LOGGER.fine(String.format("Compute statistics for union [%d,%d,%d,%d]"
+        				, (long)union.getMinX(), (long)union.getMaxX(), (long)union.getMinY(), (long)union.getMaxY()));
+        	
+        	Point[] indices = getSourceImage(0).getTileIndices( null );
+        	
+        	for (Point i : indices)
+        		computeTile(i.x, i.y);
+        	
             return Collections.unmodifiableList(zoneList);
         } else {
             return super.getProperty(name);
