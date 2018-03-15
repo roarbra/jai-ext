@@ -191,6 +191,7 @@ public class ZonalStatsOpImage extends OpImage {
             // source image bounds
             sourceBounds = createBounds(source);
 
+
             if (transform == null) {
                 // If no transformation is set, the classifier bounds are the same of the image bounds
                 inverseTrans = new AffineTransform();
