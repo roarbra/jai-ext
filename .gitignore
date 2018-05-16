@@ -5,6 +5,7 @@
 target/*
 jt-affine/target/*
 jt-algebra/target/*
+jt-clamp/target/*
 jt-scale/target/*
 jt-warp/target/*
 jt-iterators/target/*
@@ -13,6 +14,7 @@ jt-mosaic/target/*
 jt-translate/target/*
 jt-lookup/target/*
 jt-stats/target/*
+jt-threshold/target/*
 jt-zonal/target/*
 jt-crop/target/*
 jt-rescale/target/*
