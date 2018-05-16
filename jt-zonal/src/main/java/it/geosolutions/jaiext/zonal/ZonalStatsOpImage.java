@@ -188,6 +188,9 @@ public class ZonalStatsOpImage extends OpImage {
         isNotIdentity = false;
         
         if (classPresent) {
+            // source image bounds
+            sourceBounds = createBounds(source);
+
 
             if (transform == null) {
                 // If no transformation is set, the classifier bounds are the same of the image bounds
@@ -4998,7 +5001,6 @@ public class ZonalStatsOpImage extends OpImage {
     public Object getProperty(String name) {
         // If the specified property is "JAI-EXT.stats", the calculations are performed.
         if (ZonalStatsDescriptor.ZS_PROPERTY.equalsIgnoreCase(name)) {
-
         	if (LOGGER.isLoggable(Level.FINE))
         		LOGGER.fine(String.format("Compute statistics for union [%d,%d,%d,%d]"
         				, (long)union.getMinX(), (long)union.getMaxX(), (long)union.getMinY(), (long)union.getMaxY()));
